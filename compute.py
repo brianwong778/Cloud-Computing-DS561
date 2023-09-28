@@ -79,6 +79,10 @@ def compute_pagerank(graph, max_iterations=100, convergence_threshold=0.005):
         
         for page in graph:
             total = sum(pagerank[incoming_page] / len(graph[incoming_page]) for incoming_page in incoming_links[page] if incoming_page in graph)
+            
+            if not graph[page]: #dangling
+                total += sum(pagerank[other_page] for other_page in graph) / num_pages
+
             new_pagerank[page] = 0.15 + (0.85 * total)
             total_change += abs(new_pagerank[page] - pagerank[page])
         
