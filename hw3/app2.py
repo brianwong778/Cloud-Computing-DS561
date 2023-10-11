@@ -1,5 +1,4 @@
 #APP 2
-
 from google.cloud import pubsub_v1
 import time
 

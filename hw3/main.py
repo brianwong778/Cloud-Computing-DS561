@@ -7,7 +7,7 @@ import requests
 
 app = Flask(__name__)
 
-PROJECT_ID = 'your-gcp-project-id'
+PROJECT_ID = 'ds561-398719'
 TOPIC_NAME = 'error-topic'
 BANNED_COUNTRIES = ["North Korea", "Iran", "Cuba", "Myanmar", "Iraq", "Libya", "Sudan", "Zimbabwe", "Syria"]
 
