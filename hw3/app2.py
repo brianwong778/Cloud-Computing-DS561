@@ -16,7 +16,6 @@ print(f"Listening for messages on {subscription_path}...")
 streaming_pull_future = subscriber.subscribe(subscription_path, callback=callback)
 
 try:
-    # Block here to keep the script running indefinitely
     streaming_pull_future.result()
 except Exception as e:
     print(f"An exception occurred: {e}")
