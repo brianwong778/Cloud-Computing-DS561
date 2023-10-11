@@ -19,16 +19,15 @@ BANNED_COUNTRIES = ["North Korea", "Iran", "Cuba", "Myanmar", "Iraq", "Libya", "
 @functions_framework.http
 def file_server(request):
     
+    filename = request.path.lstrip('/')
+    filename = filename.replace('bu-ds561-bwong778-hw2-bucket/', '')
+    
     country = request.headers.get('X-country')
     if country in BANNED_COUNTRIES:
         error_message = f"Access attempt from banned country: {country}"
         publish_error(error_message)
 
         abort(400)
-        
-    filename = request.path.lstrip('/')
-    filename = filename.replace('bu-ds561-bwong778-hw2-bucket/', '')
-    
     
     if request.method == 'GET':
         try:
@@ -51,7 +50,11 @@ def file_server(request):
 
 def publish_error(error_message):
     data = error_message.encode("utf-8")
-    publisher.publish(topic_path, data)
+    try:
+        publisher = pubsub_v1.PublisherClient()  # reinitialize the publisher
+        publisher.publish(topic_path, data)
+    except Exception as e:
+        logging.error(f"Failed to publish error: {str(e)}")
     
     
 if __name__ =="__main__":
