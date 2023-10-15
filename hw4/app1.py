@@ -36,7 +36,7 @@ def file_server(path):
             blob = bucket.blob(filename) 
             file_content = blob.download_as_text()
             
-            return send_file(file_content, attachment_filename=filename, as_attachment=True), 200
+            return file_content, 200
         
         except Exception as e:
             logging.error(f"Error processing request: {e}")

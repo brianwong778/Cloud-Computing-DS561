@@ -6,7 +6,9 @@ sudo pip3 install Flask
 sudo pip3 install google-cloud-storage
 sudo pip3 install google-cloud-pubsub
 
-python3 ~/app1.py
+cd ..
+cd brianwong
+python3 app1.py
 
 
 //
