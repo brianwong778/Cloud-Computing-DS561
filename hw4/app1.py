@@ -1,29 +1,64 @@
-from flask import Flask, send_from_directory, abort
-from google.cloud import storage, logging
+from google.cloud import storage, pubsub_v1
+from flask import Flask, request, abort, send_file
+import logging
+import functions_framework
+import os
+import requests
 
 app = Flask(__name__)
 
-# Setup GCP storage
-storage_client = storage.Client()
-bucket = storage_client.get_bucket('YOUR_BUCKET_NAME')
+PROJECT_ID = 'ds561-398719'
+TOPIC_NAME = 'error-topic'
+BANNED_COUNTRIES = ["North Korea", "Iran", "Cuba", "Myanmar", "Iraq", "Libya", "Sudan", "Zimbabwe", "Syria"]
 
-# Setup GCP logging
-logging_client = logging.Client()
-logger = logging_client.logger('webserver_logs')
+publisher = pubsub_v1.PublisherClient()
+topic_path = publisher.topic_path(PROJECT_ID, TOPIC_NAME)
 
-@app.route('/<path:filename>', methods=['GET'])
-def get_file(filename):
-    blob = storage.Blob(filename, bucket)
-    if blob.exists():
-        return blob.download_as_text(), 200
+BANNED_COUNTRIES = ["North Korea", "Iran", "Cuba", "Myanmar", "Iraq", "Libya", "Sudan", "Zimbabwe", "Syria"]
+
+@functions_framework.http
+def file_server(request):
+    
+    filename = request.path.lstrip('/')
+    filename = filename.replace('bu-ds561-bwong778-hw2-bucket/', '')
+    
+    country = request.headers.get('X-country')
+    if country in BANNED_COUNTRIES:
+        error_message = f"Access attempt from banned country: {country}"
+        publish_error(error_message)
+
+        abort(400)
+    
+    if request.method == 'GET':
+        try:
+            storage_client = storage.Client()
+            bucket = storage_client.bucket('bu-ds561-bwong778-hw2-bucket')
+            
+            blob = bucket.blob(filename) 
+            file_content = blob.download_as_text()
+            
+            return send_file(file_content, attachment_filename=filename, as_attachment=True), 200
+        
+        except Exception as e:
+            logging.error(f"Error processing request: {e}")
+            abort(500)  
+            
     else:
-        logger.log_text(f'404 Error: {filename} not found')
-        return "File not found", 404
+        logging.error(f"Unsupported method: {request.method} for file {filename}")  
+        abort(501)
+        
 
-@app.route('/', methods=['PUT', 'POST', 'DELETE', 'HEAD', 'CONNECT', 'OPTIONS', 'TRACE', 'PATCH'])
-def not_implemented():
-    logger.log_text(f'501 Error: Method not implemented')
-    return "Not implemented", 501
+def publish_error(error_message):
+    data = error_message.encode("utf-8")
+    try:
+        publisher = pubsub_v1.PublisherClient()  # reinitialize the publisher
+        publisher.publish(topic_path, data)
+    except Exception as e:
+        logging.error(f"Failed to publish error: {str(e)}")
+    
+    
+if __name__ =="__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+        
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+
