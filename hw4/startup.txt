@@ -1,7 +1,14 @@
-// This gets pasted into GCP, not an acutal script filename
+#!/bin/bash
 
 sudo apt-get update
 sudo apt-get install -y python3 python3-pip
-pip3 install Flash google-cloud-storage
 sudo pip3 install Flask
+sudo pip3 install google-cloud-storage
+sudo pip3 install google-cloud-pubsub
 
+python3 ~/app1.py
+
+
+//
+
+gcloud compute scp ~/Downloads/ds561-hw-1/hw4/app1.py hw4-vm1:~/app1.py --zone us-east1-b

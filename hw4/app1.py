@@ -1,7 +1,6 @@
 from google.cloud import storage, pubsub_v1
 from flask import Flask, request, abort, send_file
 import logging
-import functions_framework
 import os
 import requests
 
@@ -16,10 +15,10 @@ topic_path = publisher.topic_path(PROJECT_ID, TOPIC_NAME)
 
 BANNED_COUNTRIES = ["North Korea", "Iran", "Cuba", "Myanmar", "Iraq", "Libya", "Sudan", "Zimbabwe", "Syria"]
 
-@functions_framework.http
-def file_server(request):
-    
-    filename = request.path.lstrip('/')
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def file_server(path):
+    filename = path.lstrip('/')
     filename = filename.replace('bu-ds561-bwong778-hw2-bucket/', '')
     
     country = request.headers.get('X-country')
@@ -57,8 +56,5 @@ def publish_error(error_message):
         logging.error(f"Failed to publish error: {str(e)}")
     
     
-if __name__ =="__main__":
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
-        
-
-
