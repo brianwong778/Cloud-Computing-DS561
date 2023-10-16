@@ -13,8 +13,6 @@ BANNED_COUNTRIES = ["North Korea", "Iran", "Cuba", "Myanmar", "Iraq", "Libya", "
 publisher = pubsub_v1.PublisherClient()
 topic_path = publisher.topic_path(PROJECT_ID, TOPIC_NAME)
 
-BANNED_COUNTRIES = ["North Korea", "Iran", "Cuba", "Myanmar", "Iraq", "Libya", "Sudan", "Zimbabwe", "Syria"]
-
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def file_server(path):
@@ -35,7 +33,7 @@ def file_server(path):
             
             blob = bucket.blob(filename) 
             if (not blob.exists()):
-                logging.error(f"Error code 404: {filename}: {str(e)}" )
+                logging.error('File not found:', 404 )
                 return 'File not found' , 404 
                   
             file_content = blob.download_as_text()
