@@ -13,8 +13,8 @@ BANNED_COUNTRIES = ["North Korea", "Iran", "Cuba", "Myanmar", "Iraq", "Libya", "
 publisher = pubsub_v1.PublisherClient()
 topic_path = publisher.topic_path(PROJECT_ID, TOPIC_NAME)
 
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
+@app.route('/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+@app.route('/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
 def file_server(path):
     filename = path.lstrip('/')
     filename = filename.replace('bu-ds561-bwong778-hw2-bucket/', '')
@@ -42,8 +42,7 @@ def file_server(path):
         
         except Exception as e:
             logging.error('Error', 500)
-            return 500
-            
+            return 'Internal Server Error', 500
     else:
         logging.error('Not Implemented:', 501 )
         return 'Not Implemented' , 501 
@@ -51,11 +50,9 @@ def file_server(path):
 def publish_error(error_message):
     data = error_message.encode("utf-8")
     try:
-        publisher = pubsub_v1.PublisherClient()  # reinitialize the publisher
         publisher.publish(topic_path, data)
     except Exception as e:
         logging.error(f"Failed to publish error: {str(e)}")
-    
     
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
