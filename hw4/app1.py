@@ -21,10 +21,11 @@ def file_server(path):
     
     country = request.headers.get('X-country')
     if country in BANNED_COUNTRIES:
+        logging.error('Banned Country:', 400 )
         error_message = f"Access attempt from banned country: {country}"
         publish_error(error_message)
 
-        abort(400)
+        return 'Banned country' , 400 
     
     if request.method == 'GET':
         try:
@@ -40,13 +41,12 @@ def file_server(path):
             return file_content, 200
         
         except Exception as e:
-            logging.error(f"Error processing request: {e}")
-            abort(500)  
+            logging.error('Error', 500)
+            return 500
             
     else:
-        logging.error(f"Unsupported method: {request.method} for file {filename}")  
-        abort(501)
-        
+        logging.error('Not Implemented:', 501 )
+        return 'Not Implemented' , 501 
 
 def publish_error(error_message):
     data = error_message.encode("utf-8")
