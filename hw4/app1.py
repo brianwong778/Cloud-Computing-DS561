@@ -34,8 +34,11 @@ def file_server(path):
             bucket = storage_client.bucket('bu-ds561-bwong778-hw2-bucket')
             
             blob = bucket.blob(filename) 
+            if (not blob.exists()):
+                logging.error(f"Error code 404: {filename}: {str(e)}" )
+                return 'File not found' , 404 
+                  
             file_content = blob.download_as_text()
-            
             return file_content, 200
         
         except Exception as e:
