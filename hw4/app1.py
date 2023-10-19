@@ -47,6 +47,8 @@ def file_server(path):
         logging.error('Not Implemented:', 501)
         return 'Not Implemented', 501
 
+
+
 def publish_error(error_message):
     data = error_message.encode("utf-8")
     try:
