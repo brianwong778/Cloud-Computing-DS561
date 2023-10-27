@@ -29,22 +29,29 @@ def insert_request_data(country, client_ip, gender, age, income, is_banned, time
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    # Check if client_ip and country pairing exists
-    cursor.execute("SELECT 1 FROM CountryIPs WHERE client_ip = %s", (client_ip,))
+    # Fetch country_id for given country
+    cursor.execute("SELECT country_id FROM Countries WHERE country_name = %s", (country,))
+    country_id = cursor.fetchone()
+    if not country_id:
+        cursor.execute("INSERT INTO Countries (country_name) VALUES (%s)", (country,))
+        country_id = cursor.lastrowid
+    else:
+        country_id = country_id[0]
+
+    # Check if client_ip and country_id pairing exists
+    cursor.execute("SELECT 1 FROM ClientIPs WHERE client_ip = %s", (client_ip,))
     if not cursor.fetchone():
-        cursor.execute("INSERT INTO CountryIPs (client_ip, country) VALUES (%s, %s)", (client_ip, country))
+        cursor.execute("INSERT INTO ClientIPs (client_ip, country_id) VALUES (%s, %s)", (client_ip, country_id))
 
-    # Insert into Requests_Meta
+    # Fetch ip_id for given client_ip
+    cursor.execute("SELECT ip_id FROM ClientIPs WHERE client_ip = %s", (client_ip,))
+    ip_id = cursor.fetchone()[0]
+
+    # Insert into Requests
     cursor.execute("""
-        INSERT INTO hw5_Requests_Meta (client_ip, gender, age, income, is_banned, time_of_day) 
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """, (client_ip, gender, age, income, is_banned, time_of_day))
-    
-    # Retrieve the request_id
-    request_id = cursor.lastrowid
-
-    # Insert into Requests_Files
-    cursor.execute("INSERT INTO hw5_Requests_Files (request_id, requested_file) VALUES (%s, %s)", (request_id, requested_file))
+        INSERT INTO Requests (ip_id, gender, age, income, is_banned, time_of_day, requested_file) 
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """, (ip_id, gender, age, income, is_banned, time_of_day, requested_file))
 
     connection.commit()
     cursor.close()
