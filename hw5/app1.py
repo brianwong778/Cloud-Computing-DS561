@@ -29,12 +29,7 @@ try:
     DB_USER = os.getenv('DB_USER')
     DB_PASSWORD = os.getenv('DB_PASSWORD')
     DB_NAME = os.getenv('DB_NAME')
-    
-    # DB_CONNECTION_STRING = 'ds561-398719:us-east1:bwongsql'
-    # DB_USER = 'root'
-    # DB_PASSWORD = 'bwong'
-    # DB_NAME = 'hw5db'
-    
+      
 
 except Exception as e:
     logging.error("Error getting data from env: %s", str(e))
