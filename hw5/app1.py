@@ -20,58 +20,76 @@ topic_path = publisher.topic_path(PROJECT_ID, TOPIC_NAME)
 
 # Database connection function
 def get_db_connection():
-    conn = connector.connect(
-        os.environ.get("DB_CONNECTION_STRING"),  # fetching the connection string from the environment variable
-        "pymysql",
-        user=os.environ.get("DB_USER"),          # fetching the user from the environment variable
-        password=os.environ.get("DB_PASSWORD"),  # fetching the password from the environment variable
-        db=os.environ.get("DB_NAME"),            # fetching the database name from the environment variable
+    conn = pymysql.connect(
+        host=os.environ.get("DB_HOST"),
+        user=os.environ.get("DB_USER"),
+        password=os.environ.get("DB_PASSWORD"),
+        db=os.environ.get("DB_NAME"),
+        charset='utf8mb4',
+        cursorclass=pymysql.cursors.DictCursor
     )
     return conn
 
 # Function to insert request data into the database
 def insert_request_data(country, client_ip, gender, age, income, is_banned, time_of_day, requested_file):
+    
     connection = get_db_connection()
     cursor = connection.cursor()
+    
+    try:
 
-    # Fetch country_id for given country
-    cursor.execute("SELECT country_id FROM Countries WHERE country_name = %s", (country,))
-    country_id = cursor.fetchone()
-    if not country_id:
-        cursor.execute("INSERT INTO Countries (country_name) VALUES (%s)", (country,))
-        country_id = cursor.lastrowid
-    else:
-        country_id = country_id[0]
+        # Fetch country_id for given country
+        cursor.execute("SELECT country_id FROM Countries WHERE country_name = %s", (country,))
+        country_id = cursor.fetchone()
+        if not country_id:
+            cursor.execute("INSERT INTO Countries (country_name) VALUES (%s)", (country,))
+            country_id = cursor.lastrowid
+        else:
+            country_id = country_id[0]
 
-    # Check if client_ip and country_id pairing exists
-    cursor.execute("SELECT 1 FROM ClientIPs WHERE client_ip = %s", (client_ip,))
-    if not cursor.fetchone():
-        cursor.execute("INSERT INTO ClientIPs (client_ip, country_id) VALUES (%s, %s)", (client_ip, country_id))
+        # Check if client_ip and country_id pairing exists
+        cursor.execute("SELECT 1 FROM ClientIPs WHERE client_ip = %s", (client_ip,))
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO ClientIPs (client_ip, country_id) VALUES (%s, %s)", (client_ip, country_id))
 
-    # Fetch ip_id for given client_ip
-    cursor.execute("SELECT ip_id FROM ClientIPs WHERE client_ip = %s", (client_ip,))
-    ip_id = cursor.fetchone()[0]
+        # Fetch ip_id for given client_ip
+        cursor.execute("SELECT ip_id FROM ClientIPs WHERE client_ip = %s", (client_ip,))
+        ip_id = cursor.fetchone()[0]
 
-    # Insert into Requests
-    cursor.execute("""
-        INSERT INTO Requests (ip_id, gender, age, income, is_banned, time_of_day, requested_file) 
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-    """, (ip_id, gender, age, income, is_banned, time_of_day, requested_file))
+        # Insert into Requests
+        cursor.execute("""
+            INSERT INTO Requests (ip_id, gender, age, income, is_banned, time_of_day, requested_file) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (ip_id, gender, age, income, is_banned, time_of_day, requested_file))
 
-    connection.commit()
-    cursor.close()
-    connection.close()
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+    except pymysql.MySQLError as e:
+            logging.error(f"Error while inserting request data: {str(e)}")
+            
+    finally:
+        cursor.close()
+        connection.close()
 
 # Function to insert error data into the database
 def insert_error_data(time_of_request, requested_file, error_code):
     connection = get_db_connection()
     cursor = connection.cursor()
-    insert_query = """INSERT INTO Failed_Requests (time_of_request, requested_file, error_code)
-                      VALUES (%s, %s, %s)"""
-    cursor.execute(insert_query, (time_of_request, requested_file, error_code))
-    connection.commit()
-    cursor.close()
-    connection.close()
+    try:
+        insert_query = """INSERT INTO Failed_Requests (time_of_request, requested_file, error_code)
+                        VALUES (%s, %s, %s)"""
+        cursor.execute(insert_query, (time_of_request, requested_file, error_code))
+        connection.commit()
+        cursor.close()
+        connection.close()
+        
+    except pymysql.MySQLError as e:
+        logging.error(f"Error while inserting error data: {str(e)}")
+    finally:
+        cursor.close()
+        connection.close()
 
 @app.route('/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'CONNECT', 'OPTIONS', 'TRACE'])
 @app.route('/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'CONNECT', 'OPTIONS', 'TRACE'])
