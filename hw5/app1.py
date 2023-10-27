@@ -67,7 +67,7 @@ def insert_request_data(country, client_ip, gender, age, income, is_banned, time
         connection.close()
         
     except pymysql.MySQLError as e:
-            logging.error(f"Error while inserting request data: {str(e)}")
+            logging.error("Error while inserting request data: %s", str(e))
             
     finally:
         cursor.close()
@@ -86,7 +86,7 @@ def insert_error_data(time_of_request, requested_file, error_code):
         connection.close()
         
     except pymysql.MySQLError as e:
-        logging.error(f"Error while inserting error data: {str(e)}")
+        logging.error("Error while inserting error data: %s", str(e))
     finally:
         cursor.close()
         connection.close()
@@ -107,7 +107,7 @@ def file_server(path):
     requested_file = filename
 
     if is_banned:
-        logging.error('Banned Country:', 400)
+        logging.error("Access attempt from banned country: %s", country)
         error_message = f"Access attempt from banned country: {country}"
         publish_error(error_message)
         insert_error_data(time_of_day, requested_file, 400)
@@ -129,11 +129,11 @@ def file_server(path):
             return file_content, 200
         
         except Exception as e:
-            logging.error('Error', 500)
+            logging.error("Internal Server Error: %s", str(e))
             insert_error_data(time_of_day, requested_file, 500)
             return 'Internal Server Error', 500
     else:
-        logging.error('Not Implemented:', 501)
+        logging.error("Not Implemented: %s", requested_file)
         insert_error_data(time_of_day, requested_file, 501)
         return 'Not Implemented', 501
     
@@ -142,7 +142,7 @@ def publish_error(error_message):
     try:
         publisher.publish(topic_path, data)
     except Exception as e:
-        logging.error(f"Failed to publish error: {str(e)}")
-    
+        logging.error("Failed to publish error: %s", str(e))
+        
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
