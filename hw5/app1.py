@@ -1,13 +1,11 @@
 from flask import Flask, request, abort
 from google.cloud import storage, pubsub_v1
-from google.cloud.sql.connector import connector
+from google.cloud.sql.connector import Connector
 import pymysql
+import sqlalchemy
 import logging
 import os
 from dotenv import load_dotenv
-
-storage_client = storage.Client()
-load_dotenv()
 
 app = Flask(__name__)
 
@@ -15,81 +13,102 @@ PROJECT_ID = 'ds561-398719'
 TOPIC_NAME = 'error-topic'
 BANNED_COUNTRIES = ["North Korea", "Iran", "Cuba", "Myanmar", "Iraq", "Libya", "Sudan", "Zimbabwe", "Syria"]
 
+#PubSub and Storage
+storage_client = storage.Client()
 publisher = pubsub_v1.PublisherClient()
 topic_path = publisher.topic_path(PROJECT_ID, TOPIC_NAME)
 
-# Database connection function
-def get_db_connection():
-    conn = pymysql.connect(
-        host=os.environ.get("DB_HOST"),
-        user=os.environ.get("DB_USER"),
-        password=os.environ.get("DB_PASSWORD"),
-        db=os.environ.get("DB_NAME"),
-        charset='utf8mb4',
-        cursorclass=pymysql.cursors.DictCursor
+#For connectors
+load_dotenv()
+connector = Connector()
+
+# function to return the database connection object
+def getconn():
+    conn = connector.connect(
+        DB_CONNECTION_STRING,
+        "pymysql",
+        user=DB_USER,
+        password=DB_PASSWORD,
+        db=DB_NAME
     )
     return conn
 
+# create connection pool with 'creator' argument to our connection object function
+pool = sqlalchemy.create_engine(
+    "mysql+pymysql://",
+    creator=getconn,
+)
+
 # Function to insert request data into the database
 def insert_request_data(country, client_ip, gender, age, income, is_banned, time_of_day, requested_file):
-    
-    connection = get_db_connection()
-    cursor = connection.cursor()
-    
-    try:
+    with pool.connect() as db_conn:
+        try:
+            # Fetch or create country_id for given country
+            country_id = db_conn.execute(
+                sqlalchemy.text("SELECT country_id FROM Countries WHERE country_name = :country"),
+                {"country": country}
+            ).scalar()
+            if not country_id:
+                db_conn.execute(
+                    sqlalchemy.text("INSERT INTO Countries (country_name) VALUES (:country)"),
+                    {"country": country}
+                )
+                country_id = db_conn.execute(
+                    sqlalchemy.text("SELECT LAST_INSERT_ID()")
+                ).scalar()
 
-        # Fetch country_id for given country
-        cursor.execute("SELECT country_id FROM Countries WHERE country_name = %s", (country,))
-        country_id = cursor.fetchone()
-        if not country_id:
-            cursor.execute("INSERT INTO Countries (country_name) VALUES (%s)", (country,))
-            country_id = cursor.lastrowid
-        else:
-            country_id = country_id[0]
+            # Check if client_ip and country_id pairing exists or insert
+            ip_id = db_conn.execute(
+                sqlalchemy.text("SELECT ip_id FROM ClientIPs WHERE client_ip = :client_ip"),
+                {"client_ip": client_ip}
+            ).scalar()
+            if not ip_id:
+                db_conn.execute(
+                    sqlalchemy.text("INSERT INTO ClientIPs (client_ip, country_id) VALUES (:client_ip, :country_id)"),
+                    {"client_ip": client_ip, "country_id": country_id}
+                )
+                ip_id = db_conn.execute(
+                    sqlalchemy.text("SELECT LAST_INSERT_ID()")
+                ).scalar()
 
-        # Check if client_ip and country_id pairing exists
-        cursor.execute("SELECT 1 FROM ClientIPs WHERE client_ip = %s", (client_ip,))
-        if not cursor.fetchone():
-            cursor.execute("INSERT INTO ClientIPs (client_ip, country_id) VALUES (%s, %s)", (client_ip, country_id))
+            # Insert into Requests
+            db_conn.execute(
+                sqlalchemy.text(
+                    "INSERT INTO Requests (ip_id, gender, age, income, is_banned, time_of_day, requested_file) "
+                    "VALUES (:ip_id, :gender, :age, :income, :is_banned, :time_of_day, :requested_file)"
+                ),
+                {
+                    "ip_id": ip_id,
+                    "gender": gender,
+                    "age": age,
+                    "income": income,
+                    "is_banned": is_banned,
+                    "time_of_day": time_of_day,
+                    "requested_file": requested_file
+                }
+            )
 
-        # Fetch ip_id for given client_ip
-        cursor.execute("SELECT ip_id FROM ClientIPs WHERE client_ip = %s", (client_ip,))
-        ip_id = cursor.fetchone()[0]
-
-        # Insert into Requests
-        cursor.execute("""
-            INSERT INTO Requests (ip_id, gender, age, income, is_banned, time_of_day, requested_file) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (ip_id, gender, age, income, is_banned, time_of_day, requested_file))
-
-        connection.commit()
-        cursor.close()
-        connection.close()
-        
-    except pymysql.MySQLError as e:
+            # Commit transactions
+            db_conn.commit()
+        except Exception as e:
             logging.error("Error while inserting request data: %s", str(e))
-            
-    finally:
-        cursor.close()
-        connection.close()
 
 # Function to insert error data into the database
 def insert_error_data(time_of_request, requested_file, error_code):
-    connection = get_db_connection()
-    cursor = connection.cursor()
-    try:
-        insert_query = """INSERT INTO Failed_Requests (time_of_request, requested_file, error_code)
-                        VALUES (%s, %s, %s)"""
-        cursor.execute(insert_query, (time_of_request, requested_file, error_code))
-        connection.commit()
-        cursor.close()
-        connection.close()
-        
-    except pymysql.MySQLError as e:
-        logging.error("Error while inserting error data: %s", str(e))
-    finally:
-        cursor.close()
-        connection.close()
+    with pool.connect() as db_conn:
+        try:
+            db_conn.execute(
+                sqlalchemy.text(
+                    "INSERT INTO Failed_Requests (time_of_request, requested_file, error_code) "
+                    "VALUES (:time_of_request, :requested_file, :error_code)"
+                ),
+                {"time_of_request": time_of_request, "requested_file": requested_file, "error_code": error_code}
+            )
+            
+            # Commit transactions
+            db_conn.commit()
+        except Exception as e:
+            logging.error("Error while inserting error data: %s", str(e))
 
 @app.route('/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'CONNECT', 'OPTIONS', 'TRACE'])
 @app.route('/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'CONNECT', 'OPTIONS', 'TRACE'])
