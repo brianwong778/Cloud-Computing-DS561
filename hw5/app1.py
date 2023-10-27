@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 
 app = Flask(__name__)
 
+logging.basicConfig(filename='app1.log', filemode='w', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
 PROJECT_ID = 'ds561-398719'
 TOPIC_NAME = 'error-topic'
 BANNED_COUNTRIES = ["North Korea", "Iran", "Cuba", "Myanmar", "Iraq", "Libya", "Sudan", "Zimbabwe", "Syria"]
@@ -22,29 +24,50 @@ topic_path = publisher.topic_path(PROJECT_ID, TOPIC_NAME)
 load_dotenv()
 
 # Retrieve environment variables
-DB_CONNECTION_STRING = os.getenv('DB_CONNECTION_STRING')
-DB_USER = os.getenv('DB_USER')
-DB_PASSWORD = os.getenv('DB_PASSWORD')
-DB_NAME = os.getenv('DB_NAME')
+try:
+    DB_CONNECTION_STRING = os.getenv('DB_CONNECTION_STRING')
+    DB_USER = os.getenv('DB_USER')
+    DB_PASSWORD = os.getenv('DB_PASSWORD')
+    DB_NAME = os.getenv('DB_NAME')
+    
+    # DB_CONNECTION_STRING = 'ds561-398719:us-east1:bwongsql'
+    # DB_USER = 'root'
+    # DB_PASSWORD = 'bwong'
+    # DB_NAME = 'hw5db'
+    
 
+except Exception as e:
+    logging.error("Error getting data from env: %s", str(e))
+    print('OH FUCK NOT WORKING')
+    
 connector = Connector()
 
 # function to return the database connection object
 def getconn():
-    conn = connector.connect(
-        DB_CONNECTION_STRING,
-        "pymysql",
-        user=DB_USER,
-        password=DB_PASSWORD,
-        db=DB_NAME
-    )
-    return conn
+    try:
+        conn = connector.connect(
+            DB_CONNECTION_STRING,
+            "pymysql",
+            user=DB_USER,
+            password=DB_PASSWORD,
+            db=DB_NAME
+        )
+        return conn
+    except Exception as e:
+            logging.error("Error from connector: %s", str(e))
+            print('OH FUCK CONNECTOR')
 
 # create connection pool with 'creator' argument to our connection object function
-pool = sqlalchemy.create_engine(
-    "mysql+pymysql://",
-    creator=getconn,
-)
+try:
+    pool = sqlalchemy.create_engine(
+        "mysql+pymysql://",
+        creator=getconn,
+    )
+except Exception as e:
+    logging.error("Error from pool: %s", str(e))
+    print('OH FUCK POOL')
+    
+
 
 # Function to insert request data into the database
 def insert_request_data(country, client_ip, gender, age, income, is_banned, time_of_day, requested_file):
@@ -117,30 +140,35 @@ def insert_error_data(time_of_request, requested_file, error_code):
         except Exception as e:
             logging.error("Error while inserting error data: %s", str(e))
 
+
 @app.route('/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'CONNECT', 'OPTIONS', 'TRACE'])
 @app.route('/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'CONNECT', 'OPTIONS', 'TRACE'])
 def file_server(path):
-    filename = path.lstrip('/')
-    filename = filename.replace('bu-ds561-bwong778-hw2-bucket/', '')
     
-    country = request.headers.get('X-country')
-    client_ip = request.headers.get('X-client-IP')  
-    gender = request.headers.get('X-gender') 
-    age = request.headers.get('X-age')
-    income = request.headers.get('X-income')
-    is_banned = country in BANNED_COUNTRIES
-    time_of_day = request.headers.get('X-time')  
-    requested_file = filename
-
-    if is_banned:
-        logging.error("Access attempt from banned country: %s", country)
-        error_message = f"Access attempt from banned country: {country}"
-        publish_error(error_message)
-        insert_error_data(time_of_day, requested_file, 400)
-        return 'Banned country', 400
-
     if request.method == 'GET':
+        
         try:
+        
+            filename = path.lstrip('/')
+            filename = filename.replace('bu-ds561-bwong778-hw2-bucket/', '')
+            
+            country = request.headers.get('X-country')
+            is_banned = country in BANNED_COUNTRIES
+            
+            client_ip = request.headers.get('X-client-IP')  
+            gender = request.headers.get('X-gender') 
+            age = request.headers.get('X-age')
+            income = request.headers.get('X-income')
+            time_of_day = request.headers.get('X-time')  
+            requested_file = filename
+
+            if is_banned:
+                logging.error("Access attempt from banned country: %s", country)
+                error_message = f"Access attempt from banned country: {country}"
+                publish_error(error_message)
+                insert_error_data(time_of_day, requested_file, 400)
+                return 'Banned country', 400
+
             #removed storage client initalization from here
             bucket = storage_client.bucket('bu-ds561-bwong778-hw2-bucket')         
             blob = bucket.blob(filename) 
