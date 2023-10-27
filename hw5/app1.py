@@ -18,8 +18,15 @@ storage_client = storage.Client()
 publisher = pubsub_v1.PublisherClient()
 topic_path = publisher.topic_path(PROJECT_ID, TOPIC_NAME)
 
-#For connectors
+# Load environment variables from .env file
 load_dotenv()
+
+# Retrieve environment variables
+DB_CONNECTION_STRING = os.getenv('DB_CONNECTION_STRING')
+DB_USER = os.getenv('DB_USER')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
+DB_NAME = os.getenv('DB_NAME')
+
 connector = Connector()
 
 # function to return the database connection object
