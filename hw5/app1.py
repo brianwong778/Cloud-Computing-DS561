@@ -6,6 +6,7 @@ import logging
 import os
 from dotenv import load_dotenv  # Importing python-dotenv module
 
+storage_client = storage.Client()
 load_dotenv()  # Loading environment variables from .env file
 
 app = Flask(__name__)
@@ -61,7 +62,7 @@ def insert_request_data(country, client_ip, gender, age, income, is_banned, time
 def insert_error_data(time_of_request, requested_file, error_code):
     connection = get_db_connection()
     cursor = connection.cursor()
-    insert_query = """INSERT INTO hw5_Failed_Requests (time_of_request, requested_file, error_code)
+    insert_query = """INSERT INTO Failed_Requests (time_of_request, requested_file, error_code)
                       VALUES (%s, %s, %s)"""
     cursor.execute(insert_query, (time_of_request, requested_file, error_code))
     connection.commit()
@@ -93,9 +94,8 @@ def file_server(path):
 
     if request.method == 'GET':
         try:
-            storage_client = storage.Client()
-            bucket = storage_client.bucket('bu-ds561-bwong778-hw2-bucket')
-            
+            #removed storage client initalization from here
+            bucket = storage_client.bucket('bu-ds561-bwong778-hw2-bucket')         
             blob = bucket.blob(filename) 
             if not blob.exists():
                 logging.error('File not found:', 404)
