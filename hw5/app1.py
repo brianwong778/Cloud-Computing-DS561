@@ -50,7 +50,7 @@ def getconn():
         return conn
     except Exception as e:
             logging.error("Error from connector: %s", str(e))
-            print('OH FUCK CONNECTOR')
+            #print('1')
 
 # create connection pool with 'creator' argument to our connection object function
 try:
@@ -60,7 +60,7 @@ try:
     )
 except Exception as e:
     logging.error("Error from pool: %s", str(e))
-    print('OH FUCK POOL')
+    #print('2')
     
 
 
