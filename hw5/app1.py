@@ -33,7 +33,7 @@ try:
 
 except Exception as e:
     logging.error("Error getting data from env: %s", str(e))
-    print('OH FUCK NOT WORKING')
+    #print('connector error')
     
 connector = Connector()
 
