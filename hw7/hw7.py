@@ -1,80 +1,96 @@
 import apache_beam as beam
-from apache_beam.options.pipeline_options import PipelineOptions
+from apache_beam.io import fileio
 import re
-import os
+import logging
+from bs4 import BeautifulSoup
 
-# Custom DoFn to extract file name and content
-class ExtractFileNameAndContent(beam.DoFn):
-    def __init__(self, file_pattern):
-        self.file_pattern = file_pattern
+logging.basicConfig(level=logging.INFO, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 
-    def process(self, element):
-        file_name = os.path.basename(re.search(r'gs://.*/(.*)', self.file_pattern).group(1))
-        yield file_name, element
+BUCKET_NAME = 'bu-ds561-bwong778-hw2-bucket'
+DIRECTORY = 'generated_files'
+OUTPUT_BUCKET_PATH = f'gs://{BUCKET_NAME}/output/'
 
-# Function to extract outgoing links from a file
-def extract_outgoing_links(element):
-    _, content = element
-    return re.findall(r'href="(\d+\.html)"', content)
+class ReadHTMLFiles(beam.DoFn):
+    def process(self, file_metadata):
+        try:
+            file_name = file_metadata.metadata.path
+            with file_metadata.open() as file:
+                contents = file.read().decode('utf-8')
+                yield file_name, contents
+        except Exception as e:
+            logging.error(f"Error processing file {file_metadata.metadata.path}: {e}")
 
-# Function to extract file and incoming links
-def extract_file_and_links(element):
-    file_name, content = element
-    links = re.findall(r'href="(\d+\.html)"', content)
-    return [(link, file_name) for link in links]
-
-# Function to format the results
-def format_result(element):
+def find_hyperlinks(element):
+    from bs4 import BeautifulSoup 
     try:
-        file_name, count = element
-        return f'{file_name}: {count} links'
-    except ValueError:
-        # Handle cases where element does not have two values
-        return f'Error: Element {element} does not match expected format'
+        file_name, content = element
+        soup = BeautifulSoup(content, 'html.parser')
+        for a in soup.find_all('a', href=True):
+            link = a.get('href')
+            if re.match(r'\d+\.html', link):
+                yield (file_name, link)
+    except Exception as e:
+        logging.error(f'find_hyperlinks error: {e}')
 
-#Credentials
-project_id = 'ds561-398719'
-bucket_name = 'bu-ds561-bwong778-hw2-bucket'
-region = 'us-east1'
-file_pattern = f'gs://{bucket_name}/generated_files/*.html'
+def link_to_file_mapping(element):
+    file_name, link = element
+    return link, file_name
 
-# Define output file locations
-outgoing_links_output = f'gs://{bucket_name}/results/outgoing_links.txt'
-incoming_links_output = f'gs://{bucket_name}/results/incoming_links.txt'
+def calculate_incoming_links(element):
+    target_link, sources = element
+    return target_link, len(list(sources))
 
-# Pipeline options
-options = PipelineOptions(
-    runner='DataFlowRunner',
-    project=project_id,
-    region=region,
-    temp_location=f'gs://{bucket_name}/temp',
-    staging_location=f'gs://{bucket_name}/staging'
-)
+def count_total_links(element):
+    file_name, links = element
+    return file_name, len(list(links))
 
-with beam.Pipeline(options=options) as p:
-    # Read files and their names
-    files = (
-        p
-        | 'ReadFromGCS' >> beam.io.ReadFromText(file_pattern)
-        | 'ExtractFileNameAndContent' >> beam.ParDo(ExtractFileNameAndContent(file_pattern))
+def main():
+    options = beam.options.pipeline_options.PipelineOptions(
+        runner='DataflowRunner',
+        project='ds561-398719',
+        temp_location=f'gs://{BUCKET_NAME}/temp',
+        region='us-east1',
+        requirements = 'requirements.txt'
     )
 
-    # Outgoing links: Count links in each file
-    outgoing_links = (
-        files
-        | 'ExtractOutgoingLinks' >> beam.FlatMap(extract_outgoing_links)
-        | 'CountOutgoingLinks' >> beam.combiners.Count.PerElement()
-        | 'Top5OutgoingLinks' >> beam.combiners.Top.Of(5, key=lambda x: x[1])
-        | 'FormatOutgoingResults' >> beam.Map(format_result)
-        | 'WriteOutgoingResults' >> beam.io.WriteToText(outgoing_links_output)
-    )
+    with beam.Pipeline(options=options) as p:
+        read_html = (
+            p 
+            | 'MatchHTMLFiles' >> fileio.MatchFiles(f'gs://{BUCKET_NAME}/{DIRECTORY}/*.html')
+            | 'ReadHTMLMatches' >> fileio.ReadMatches()
+            | 'ReadHTMLFiles' >> beam.ParDo(ReadHTMLFiles())
+            | 'FindHyperlinks' >> beam.FlatMap(find_hyperlinks)
+        )
 
-    # Incoming links: Count how many times each file is linked to
-    incoming_links = (
-        files
-        | 'ExtractIncomingLinks' >> beam.FlatMap(extract_file_and_links)
-        | 'CountIncomingLinks' >> beam.combiners.Count.PerElement()
-        | 'Top5IncomingLinks' >> beam.combiners.Top.Of(5, key=lambda x: x[1])
-        | 'FormatIncomingResults' >> beam.Map(format_result)
-        | 'WriteIncomingResults' >> beam.io.WriteToText(incoming_links_output)
-    )
+        map_links = (
+            read_html
+            | 'LinkToFileMapping' >> beam.Map(lambda element: (element[1], element[0]))
+        )
+
+        outgoing_link_count = (
+            read_html 
+            | 'GroupByHTMLFile' >> beam.GroupByKey()
+            | 'CountOutgoingLinks' >> beam.Map(count_total_links)
+        )
+        incoming_link_count = (
+            map_links
+            | 'GroupByHyperlink' >> beam.GroupByKey()
+            | 'CalculateIncomingLinks' >> beam.Map(calculate_incoming_links)
+        )
+
+        top_outgoing_links = (
+            outgoing_link_count
+            | 'TopOutgoingLinks' >> beam.transforms.combiners.Top.Of(5, key=lambda x: x[1])
+        )
+
+        top_incoming_links = (
+            incoming_link_count
+            | 'TopIncomingLinks' >> beam.transforms.combiners.Top.Of(5, key=lambda x: x[1])
+        )
+
+        # Output the results to Google Cloud Storage
+        top_outgoing_links | 'WriteTopOutgoingLinks' >> beam.io.WriteToText(OUTPUT_BUCKET_PATH + 'outgoing_links')
+        top_incoming_links | 'WriteTopIncomingLinks' >> beam.io.WriteToText(OUTPUT_BUCKET_PATH + 'incoming_links')
+
+if __name__ == '__main__':
+    main()
