@@ -1,7 +1,8 @@
-from flask import Flask, request, abort
 from google.cloud import storage, pubsub_v1
+from flask import Flask, request, abort, send_file, Response
 import logging
 import os
+import requests
 
 
 app = Flask(__name__)
@@ -46,7 +47,10 @@ def file_server(path):
                 return 'File not found', 404
                 
             file_content = blob.download_as_text()
-            return file_content, 200
+            zone = get_instance_zone()
+            response = Response(file_content)
+            response.headers['X-VM-Zone'] = zone
+            return response
         
         except Exception as e:
             logging.error("Internal Server Error: %s", str(e))
@@ -54,6 +58,18 @@ def file_server(path):
     else:
         logging.error("Not Implemented: %s", requested_file)
         return 'Not Implemented', 501
+    
+def get_instance_zone():
+    try:
+        headers = {"Metadata-Flavor": "Google"}
+        r = requests.get("http://metadata.google.internal/computeMetadata/v1/instance/zone", headers=headers)
+        if r.status_code == 200:
+            # The response includes the full zone path. We extract just the zone name.
+            return r.text.split('/')[-1]
+        return "Unknown"
+    except Exception as e:
+        logging.error(f"Failed to get zone: {str(e)}")
+        return "Error"
     
 def publish_error(error_message):
     data = error_message.encode("utf-8")
