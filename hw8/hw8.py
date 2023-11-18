@@ -25,6 +25,7 @@ def file_server(path):
         publish_error(error_message)
         logging.error("From banned country")
         return "Banned country request: 400", 400
+    
     if request.method == 'GET':
             storage_client = storage.Client()
             bucket = storage_client.bucket('bu-ds561-bwong778-hw2-bucket')       
@@ -65,4 +66,4 @@ def publish_error(error_message):
         logging.error(f"Failed to publish error: {str(e)}")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 80)))
