@@ -12,7 +12,7 @@ app = Flask(__name__)
 logging.basicConfig(filename='app1.log', filemode='w', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 PROJECT_ID = 'ds561-398719'
-TOPIC_NAME = 'error-topic'
+TOPIC_NAME = 'hw10-topic'
 BANNED_COUNTRIES = ["North Korea", "Iran", "Cuba", "Myanmar", "Iraq", "Libya", "Sudan", "Zimbabwe", "Syria"]
 
 #PubSub and Storage
@@ -201,7 +201,7 @@ def file_server(path):
         try:
         
             filename = path.lstrip('/')
-            filename = filename.replace('bu-ds561-bwong778-hw2-bucket/', '')
+            filename = filename.replace('hw10-bucket/', '')
             
             country = request.headers.get('X-country')
             is_banned = country in BANNED_COUNTRIES
@@ -221,7 +221,7 @@ def file_server(path):
                 return 'Banned country', 400
 
             #removed storage client initalization from here
-            bucket = storage_client.bucket('bu-ds561-bwong778-hw2-bucket')         
+            bucket = storage_client.bucket('hw10-bucket')         
             blob = bucket.blob(filename) 
             if not blob.exists():
                 logging.error('File not found:', 404)

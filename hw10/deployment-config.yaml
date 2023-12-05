@@ -52,7 +52,6 @@ resources:
         items:
           - web-server-8080
 
-
   # VM for Pub/Sub Listener
   - name: pubsub-listener-vm
     type: compute.v1.instance
@@ -76,13 +75,11 @@ resources:
         dependsOn:
           - service-account
 
-
   # Cloud SQL Database
   - name: sql-database-instance
     type: sqladmin.v1beta4.instance
     properties:
       region: us-east1
-      project: ds561-398719
       settings:
         tier: db-custom-4-16384
 
@@ -97,7 +94,14 @@ resources:
     type: gcp-types/pubsub-v1:projects.subscriptions
     properties:
       subscription: hw10-sub
-      topic: projects/ds-561/topics/hw10-topic
+      topic: projects/ds561-398719/topics/hw10-topic
     metadata:
       dependsOn:
         - hw10-topic
+
+  # Google Cloud Storage Bucket
+  - name: hw10-bucket
+    type: storage.v1.bucket
+    properties:
+      location: US
+      storageClass: STANDARD
