@@ -1,6 +1,7 @@
 from google.cloud import pubsub_v1
 import time
 
+
 PROJECT_ID = 'ds561-398719'
 SUBSCRIPTION_NAME = 'error-subscription'
 TOPIC_NAME = 'error-topic'
