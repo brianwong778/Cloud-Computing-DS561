@@ -51,12 +51,12 @@ def file_server(request):
 def publish_error(error_message):
     data = error_message.encode("utf-8")
     try:
-        publisher = pubsub_v1.PublisherClient()  # reinitialize the publisher
+        publisher = pubsub_v1.PublisherClient()  
         publisher.publish(topic_path, data)
     except Exception as e:
         logging.error(f"Failed to publish error: {str(e)}")
     
-    
+
 if __name__ =="__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
         

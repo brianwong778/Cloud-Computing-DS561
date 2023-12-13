@@ -18,5 +18,5 @@ streaming_pull_future = subscriber.subscribe(subscription_path, callback=callbac
 try:
     streaming_pull_future.result()
 except Exception as e:
-    print(f"An exception occurred: {e}")
+    print(f"An Exception occurred: {e}")
     streaming_pull_future.cancel()
