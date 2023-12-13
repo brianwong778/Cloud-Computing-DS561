@@ -10,7 +10,6 @@ import os
 import ssl
 from datetime import date
 
-
 list_of_countries = [ 'Afghanistan', 'Albania', 'Algeria', 'Andorra',
                       'Angola', 'Antigua and Barbuda', 'Argentina', 'Armenia',
                       'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain',
