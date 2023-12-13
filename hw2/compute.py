@@ -106,7 +106,8 @@ def main():
         
     #Compute and print the top 5 pages with highest PageRank
     compute_pagerank(graph)
-    
+
+
 if __name__ == "__main__":
   main()
 
